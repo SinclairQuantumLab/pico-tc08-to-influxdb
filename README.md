@@ -1,33 +1,31 @@
-# PicoLog TC-08 temperature logging Python app for Josiah Siclair group use
+# PicoLog TC-08 temperature logging Python app for Josiah Sinclair group use
 
 ## Functions
 
 Periodically read temps and upload it to Sr group's InfluxDB
 
+## Requirements
+
+- PicoSDK C libraries for the TC-08
+- PicoLog TC-08 thermocouple logger and thermocouples
+- [`uv`](https://docs.astral.sh/uv/getting-started/installation/) Python project manager
+- Access to the target InfluxDB bucket
+- TC-08 logger info:
+  - Serial number
+  - Channel configuration
+  - Measurement period
+
 ## Initial setup
 
-1. Install Miniforge (prefered; <https://github.com/conda-forge/miniforge>) or Miniconda (<https://docs.conda.io/projects/miniconda/en/latest/>).
-2. Open VSCode, open this folder in VSCode, and create conda environment in VSCode
-    - Command Palette (Ctrl+Shift+P) -> Python: Create Environment... -> Conda
-    - **For Windows**, Go to Command Palette (Ctrl+Shift+P) -> Preferences: Open User Settings (JSON) and add the following item in the opened `setting.json` file, to avoid PowerShell from blocking `$PROFILE` `.ps1` file from running (corresponding to `.bashrc` file for `bash`) and thus preventing conda environment from being activated:
+1. Install `picosdk`, the SDK for Pico devices, before installing this app.
 
-        ```JSON
-        "terminal.integrated.profiles.windows": {
-            "PowerShell": {
-                "source": "PowerShell",
-                "icon": "terminal-powershell",
-                "args": ["-ExecutionPolicy", "Bypass"],
-            }
-        },
-        "terminal.integrated.defaultProfile.windows": "PowerShell",
-        ```
+   Follow the instruction in README of `picosdk-python-wrappers` github repo: <https://github.com/picotech/picosdk-python-wrappers>, depending on the OS. The below is the brief instructuion as of 06/23/2024.
 
-3. Open `runtest.py` and press `F5` key to let PowerShell terminal opened in VSCode and the conda environment are activated.
-4. Install `picosdk`, the SDK for Pico devices, and the Python wrapper, following the instruction in README of `picosdk-python-wrappers` github repo: <https://github.com/picotech/picosdk-python-wrappers>, depending on the OS. The below is the brief instructuion as of 06/23/2024.
-    1. Installing `picosdk`:
+    1. Installing `picosdk` C libraries:
         - Windows:
             1. Download `PicoSDK_64_10.7.26.362.exe` from <https://www.picotech.com/downloads>.
-            2. Run the `.exe` file to install `picosdk'
+            2. Run the `.exe` file to install `picosdk`.
+            3. Close and reopen PowerShell after installing PicoSDK so updated system paths are loaded.
         - Ubuntu: run the below command lines in `bash` terminal:
 
             ```bash
@@ -37,64 +35,78 @@ Periodically read temps and upload it to Sr group's InfluxDB
             sudo apt install libusbtc08
             ```
 
-    2. Installing python wapper package
-        1. Download the `picosdk-python-wrappers` github repo to a folder.
-
-            ```bash
-            cd <folder path>
-            git clone https://github.com/picotech/picosdk-python-wrappers.git
-            ```
-
-            Install GIT (<https://git-scm.com/>) if it has not bean istalled!
-        2. Activate the conda environment for Sr3 TC08 logging software.
-
-            ```bash
-            conda activate <path to Sr3 TC08 repo folder>/.conda
-            ```
-
-        3. Install the Python package in the conda env.
-
-            ```bash
-            cd picosdk-python-wrappers
-            ```
-
-            - Windows:
-
-                ```powershell
-                pip install .
-                ```
-
-            - Linux:
-
-                ```bash
-                pip install . --user
-                ```
-
-                to install for the current user only, or
-
-                ```bash
-                sudo pip install .
-                ```
-
-        4. Run `conda list` and check if the `picosdk` package is successfully installed (over pypi).
     (Optional) installing a GUI software named PicoLog <https://www.picotech.com/downloads> for the OS will help checking the connection to and features of TC-08 device.
-5. Run `conda install -r requirements` in the terminal to install required Python packages.
-    - If Raspberry Pi 3B+ is used, do not use any Conda distributions and instead do everything in `venv` with system's `python`.
-    - The 64-bit ARM architecture (aach64) for Raspberry Pi 4B is not supported by Pico Technology (as of 2023/10/22; see <https://www.picotech.com/support/viewtopic.php?t=42162>)
-6. Try running `picotest.py` script by pressing `F5` key to check if picosdk successfully read the temperature from the logger.
-7. Run `mamba install influxdb-client` in miniforge (or `python -m pip install influxdb-client` for other conda).
+
+2. **(IMPORTANT) REBOOT THE COMPUTER AFTER INSTALLING `picosdk`**. The path to the library should be appended into the `PATH` environment variable (e.g., `C:\Program Files\Pico Technology\SDK\lib\` in Windows).
+
+3. Install [`uv`](https://docs.astral.sh/uv/getting-started/installation/) Python project manager if it has not been installed.
+
+4. Open a terminal (e.g., PowerShell for Windows) and go to the location to install this app as like the below example:
+
+    ```powershell
+    cd $HOME\Projects\ # for windows.
+    ```
+
+    ```bash
+    cd ~/Projects/ # for linux
+    ```
+
+5. Clone this repo:
+
+    ```bash
+    git clone https://github.com/SinclairQuantumLab/pico-tc08-influxdb.git
+    cd pico-tc08-influxdb/
+    ```
+
+6. Run `uv sync` to install this app.
+
+    ```bash
+    uv sync
+    ```
+
+    This installs packages from `pyproject.toml` and `uv.lock`, including `influxdb-client` and the Python package imported as `picosdk`.
+
+    - The PicoSDK C libraries from Step 1 are still required for hardware access.
+    - If `picosdk.errors.CannotFindPicoSDKError` appears, the Python wrapper is installed but the PicoSDK C library is not visible on the system path. Install the PicoSDK C libraries, then close and reopen the terminal.
+    - If Raspberry Pi 3B+ is used, prefer the system Python with a local virtual environment, for example `uv venv --python python3`.
+    - The 64-bit ARM architecture (aarch64) for Raspberry Pi 4B is not supported by Pico Technology (as of 2023/10/22; see <https://www.picotech.com/support/viewtopic.php?t=42162>)
+
+7. Try running `picotest.py` to check if picosdk successfully read the temperature from the logger.
+
+    ```bash
+    uv run picotest.py
+    ```
+
+    The output should look like the below example:
+
+    ```powershell
+    > uv run .\picotest.py
+    Meas#0: Cold Junction=23.909324645996094, Channel 1=22.9122314453125,
+    Meas#1: Cold Junction=23.909475326538086, Channel 1=22.86825180053711,
+    Meas#2: Cold Junction=23.909475326538086, Channel 1=23.180992126464844,
+    {'open_unit': 1, 'set_mains': 1, 'set_channel': 1, 'get_minimum_interval_ms': 200, 'get_single': 1, 'close_unit': 1}
+    <__main__.c_float_Array_9 object at 0x000001B1AFA1E760>
+    ```
+
 8. Open `main.py` and setup `assingment` dict variable to assign `Location` (description of where the temp is being measured) and `Channel` (TC-08 logger's channel #) of temp measurements. Set measurement period to `period` variable with the unit of second.
-9. Try running `main.py` script by pressing `F5` key to check if the app runs as it should.
+
+9. Try running `main.py` script by pressing `F5` key, or using `uv run`, to check if the app runs as it should.
+
+    ```bash
+    uv run main.py
+    ```
+
 10. Check if a relevant way to start up the app in the next section works.
 
 ## Starting app
 
 ### Windows
 
-1. Copy and rename `./run_TC08logger.ps1.bak` to `./run_TC08logger.ps1`
-2. Open the `./run_TC08logger.ps1` script file and update the placeholder:
-    - `$host.ui.RawUI.WindowTitle = "##Type here the desired title of the consol; see README.md##"`
-3. Run (doubleclick) `.\Startup_windows.lnk` shortcut file. If the `.lnk` file is moved/copied out of the software folder (with `main.py`), change the `Start in` value from `%CD` to the absolute path of the software folder (e.g., `"%USERPROFILE%\PicoLog TC-80 temp logging\TC08logger"`) in the Properties setting below:
+1. Run `uv sync` once in the project root so `.venv` exists.
+2. Copy and rename `./run_TC08logger.ps1.bak` to `./run_TC08logger.ps1`
+3. Open the `./run_TC08logger.ps1` script file and update the placeholder:
+    - `$host.ui.RawUI.WindowTitle = "##Type here the desired title of the console; see README.md##"`
+4. Run (doubleclick) `.\Startup_windows.lnk` shortcut file. If the `.lnk` file is moved/copied out of the software folder (with `main.py`), change the `Start in` value from `%CD` to the absolute path of the software folder (e.g., `"%USERPROFILE%\PicoLog TC-80 temp logging\TC08logger"`) in the Properties setting below:
 ![image](windows-lnk-setting.jpg)
 
 Tested for Windows 11.
@@ -103,14 +115,15 @@ Tested for Windows 11.
 
 Go to *Activity* dashboard and click *TC08logger* icon that is to be made by the following procedure:
 
-1. Grant excecutable permission to `./Startup_bash` and `./Startup_ubuntu` files by running the below line in a terminal.
+1. Run `uv sync` once in the project root so `.venv` exists.
+2. Grant excecutable permission to `./Startup_bash` and `./Startup_ubuntu` files by running the below line in a terminal.
 
 ```bash
     cd <root folder path>
     chmod +x ./Startup_bash ./Startup_ubuntu
 ```
 
-2. Copy and rename `./Startup_ubuntu.bak` to `./Startup_ubuntu` and `./Startup_ubuntu.desktop.bak` to `./Startup_ubuntu_<a unique name>.desktop` (e.g., `./Startup_ubuntu_TC08logger.desktop`) in the same folder (i.e., the root folder).
+1. Copy and rename `./Startup_ubuntu.bak` to `./Startup_ubuntu` and `./Startup_ubuntu.desktop.bak` to `./Startup_ubuntu_<a unique name>.desktop` (e.g., `./Startup_ubuntu_TC08logger.desktop`) in the same folder (i.e., the root folder).
 2. Open the `Startup_ubuntu` script file and update the placeholders
     - `DIR_TC08LOGGER="##type here the path to the project folder; see README.md##"`
     - `gnome-terminal --title="##Type here the desired title of the terminal##" -- bash -i -c "$STR_CMD"`
@@ -165,3 +178,4 @@ It will start reading temps, print in stdout, and uploading to Grafana's DB peri
   - README.md was copied as README_SDK.md and a corresponding change was made in setup.py (see top comments as a release note therein)
 - main.py is the entry point and contain all the essential codes.
 - The codes are developed from the TC-08 SINGLE MODE EXAMPLE in the SDK folder (../picosdk-python-wrappers-master/usbtc08Examples/tc08SingleModeExample.py).
+- `pyproject.toml`, `uv.lock`, and `.python-version` are used for the current `uv` workflow.
