@@ -1,5 +1,5 @@
 [project]
-name = "pico-tc08-influxdb"
+name = "pico-tc08-to-influxdb"
 version = "0.1.0"
 description = "Relay PicoLog TC-08 thermocouple readings to InfluxDB."
 readme = "README.md"

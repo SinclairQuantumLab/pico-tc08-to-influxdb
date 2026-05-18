@@ -6,114 +6,68 @@ import ctypes
 from picosdk.usbtc08 import usbtc08 as tc08
 from picosdk.functions import assert_pico2000_ok
 
-from influxdb_client import InfluxDBClient
-from influxdb_client.client.write_api import SYNCHRONOUS
 from time import sleep
 from datetime import datetime
 import traceback
 
-import os
 from pathlib import Path
+import sys
 
-# >>>>> User parameters >>>>>
-# TC-08 Serial number
-SN = "AC161/246"
+import tomllib
+from typing import Any
 
-# Measurement period
-period = 15  # in second
+# >>>>> app configuration >>>>>
+if len(sys.argv) > 2:
+    raise SystemExit("Usage: uv run main.py [settings.toml]")
+settings_path = sys.argv[1] if len(sys.argv) == 2 else "./settings.toml"
 
-# TC08 logger channels to activate & names assigned in InfluxDB
-assignments = [
-    {
-        "num": 1,
-        "name": "Ch1",
-    },
-    {
-        "num": 2,
-        "name": "Ch2",
-    },
-    {
-        "num": 3,
-        "name": "Ch3",
-    },
-    {
-        "num": 4,
-        "name": "Ch4",
-    },
-    {
-        "num": 5,
-        "name": "Ch5",
-    },
-    {
-        "num": 6,
-        "name": "Ch6",
-    },
-    {
-        "num": 7,
-        "name": "Ch7",
-    },
-    {
-        "num": 8,
-        "name": "Ch8",
-    },
-]
+with open(settings_path, "rb") as f:
+    SETTINGS: dict[str, Any] = tomllib.load(f)
 
-# legacy channel assignments
-assignments_legacy = [
-    {
-        "Location": "Exp table bottom ambient",
-        "Channel": 1,
-    },
-    {
-        "Location": "Exp table top ambient",
-        "Channel": 2,
-    },
-    {
-        "Location": "MOT coil cooling pipe out",
-        "Channel": 3,
-    },
-    {
-        "Location": "MOT coil cooling pipe in",
-        "Channel": 4,
-    },
-    {
-        "Location": "Blue laser table ambient",
-        "Channel": 5,
-    },
-    {
-        "Location": "H latt PCF input end",
-        "Channel": 6,
-    },
-    {
-        "Location": "813 IFDL breadboard",
-        "Channel": 7,
-    },
-    {
-        "Location": "813 IFDL baseplate",
-        "Channel": 8,
-    },
-]
-# <<<<< User parameters <<<<<
+SN = str(SETTINGS["sn"])
+period = float(SETTINGS["period_s"])  # in second
+measurement = str(SETTINGS.get("measurement", "TC08logger"))
+channels: dict[int, str] = {
+    int(channel): name for channel, name in SETTINGS["channels"].items()
+}
+enable_logging = bool(SETTINGS.get("enable_logging", True))
+dirname_log = str(SETTINGS.get("dirname_log", "./logs/"))  # folder to save log files
+fname_log_meas = str(SETTINGS.get("fname_log_meas", "temp.log"))
+fname_log_err = str(SETTINGS.get("fname_log_err", "error.log"))
+# <<< load & parse config files <<<
 
+log_dir = Path(dirname_log)
+path_log_meas = log_dir / fname_log_meas
+path_log_err = log_dir / fname_log_err
+if enable_logging:
+    log_dir.mkdir(exist_ok=True, parents=True)
 
-# should not need to touch the below
+print(f"TC-08 logger SN = {SN}")
+print(f"Settings file = {settings_path}")
+print(f"Measurement period = {period} s.")
+print(f"Active channels = {list(channels.keys())}.")
+print(f"File logging = {'enabled' if enable_logging else 'disabled'}.")
+if enable_logging:
+    print(f"Measurement log = {path_log_meas}")
+    print(f"Error log = {path_log_err}")
+print()
 
-# yemonitor database credentials
-url = "http://yemonitor.colorado.edu:8086"
-token = "yelabtoken"
-org = "yelab"
-bucket = "sr3"  # If bucket not exists, create it from the database UI.
+# <<<<< app configuration <<<<<
 
-channels = [
-    assignment["num"] for assignment in assignments
-]  # TC08 logger's channels to activate
+# >>> load IMAQ config >>>
+with open("imaq_config/auth.toml", "rb") as f:
+    AUTH = tomllib.load(f)
+# <<< load IMAQ config <<<
 
-# Names of log files
-dirname_log = "./logs/"  # folder to save log files
-Path(dirname_log).mkdir(exist_ok=True)
-
-fname_log_meas = "temp.log"  # log for measure temperatures
-fname_log_err = "error.log"  # log for errors
+# >>> InfluxDB configuration >>>
+import influxdb_client
+from influxdb_client.client.write_api import SYNCHRONOUS
+INFLUXDB_CLIENT = influxdb_client.InfluxDBClient(**AUTH["influxdb"])
+INFLUXDB_WRITE_API = INFLUXDB_CLIENT.write_api(write_options=SYNCHRONOUS)
+INFLUXDB_ORG = AUTH["influxdb"]["org"]; INFLUXDB_BUCKET = AUTH["influxdb"]["bucket"]
+print(f"InfluxDB client initialized for org='{INFLUXDB_ORG}', bucket='{INFLUXDB_BUCKET}'.")
+print()
+# <<< InfluxDB configuration <<<
 
 
 def main():
@@ -141,7 +95,6 @@ def main():
         assert_pico2000_ok(status["set_mains"])
 
         # set up channel
-        # channels = [ assignment["Channel"] for assignment in assignments ]  # channels to activate
         # therocouples types and int8 equivalent
         # B=66 , E=69 , J=74 , K=75 , N=78 , R=82 , S=83 , T=84 , ' '=32 , X=88
         typeK = ctypes.c_int8(75)
@@ -160,10 +113,6 @@ def main():
         overflow = ctypes.c_int16(0)
 
         # raise Exception() # error test
-
-        # create log folder if not exist
-        if not os.path.exists(dirname_log):
-            os.makedirs(dirname_log)
 
         # repeat measuring temps and upload to DB server
         while True:
@@ -185,16 +134,17 @@ def main():
 
                 print(measstr)
 
-                with open(dirname_log + fname_log_meas, "a") as f:
-                    f.write(measstr + "\n")
+                if enable_logging:
+                    with path_log_meas.open("a") as f:
+                        f.write(measstr + "\n")
 
-                # upload results to yemonitor DB
+                # upload results to InfluxDB
                 # format your data to write to the database server
 
                 records = \
                     [  # cold junction
                         {
-                            "measurement": "TC08logger",
+                            "measurement": measurement,
                             "tags": {
                                 "Logger SN": SN,
                                 "Channel": "Cold Junction",
@@ -204,54 +154,38 @@ def main():
                     ] + \
                     [  # channel temperatures
                         {
-                            "measurement": "TC08logger",
+                            "measurement": measurement,
                             "tags": {
                                 "Logger SN": SN,
-                                "Channel": assignment["name"],
+                                "Channel": channel_name,
                             },
-                            "fields": {"Temp[degC]": temp[assignment["num"]]},
+                            "fields": {"Temp[degC]": temp[channel]},
                         }
-                        for assignment in assignments
-                    ] + \
-                    [  # legacy format
-                        # cold junction
-                        {
-                            "measurement": "TC08logger",
-                            "tags": {
-                                "Logger SN": SN,
-                                "Location": "Cold Junction",
-                            },
-                            "fields": {"Temp[degC]": temp[0]},
-                        }
-                    ] + \
-                    [  # channel temperatures
-                        {
-                            "measurement": "TC08logger",
-                            "tags": {
-                                "Logger SN": SN,
-                                "Location": assignment["Location"],
-                            },
-                            "fields": {"Temp[degC]": temp[assignment["Channel"]]},
-                        }
-                        for assignment in assignments_legacy
+                        for channel, channel_name in channels.items()
                     ]
 
                 # send the data
-                with InfluxDBClient(url=url, token=token, org=org) as client:
-                    with client.write_api(write_options=SYNCHRONOUS) as writer:
-                        writer.write(bucket=bucket, record=records)
+                INFLUXDB_WRITE_API.write(
+                    bucket=INFLUXDB_BUCKET,
+                    org=INFLUXDB_ORG,
+                    record=records,
+                )
 
             except Exception as ex:
                 datetimestr = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
-                measstr = f"{datetimestr}: Error occured during a measurement. See \"{dirname_log + fname_log_err}\"."
+                measstr = f"{datetimestr}: Error occured during a measurement."
+                if enable_logging:
+                    measstr += f" See \"{path_log_err}\"."
                 print(measstr)
-                with open(dirname_log + fname_log_meas, "a") as f:
-                    f.write(measstr + "\n")
+                if enable_logging:
+                    with path_log_meas.open("a") as f:
+                        f.write(measstr + "\n")
 
                 exstr = f"{datetimestr}: Error occured during a measurement.\n"
                 exstr += "".join(traceback.format_exception(ex))
-                with open(dirname_log + fname_log_err, "a") as f:
-                    f.write(exstr + "\n\n")
+                if enable_logging:
+                    with path_log_err.open("a") as f:
+                        f.write(exstr + "\n\n")
 
             # wait until next period
             sleep(period)
@@ -263,14 +197,20 @@ def main():
         print(exstr)
 
         # append error message to log file
-        with open(dirname_log + fname_log_err, "a") as f:
-            f.write(exstr + "\n\n")
+        if enable_logging:
+            with path_log_err.open("a") as f:
+                f.write(exstr + "\n\n")
 
     finally:
         # close unit
         try:
             status["close_unit"] = tc08.usb_tc08_close_unit(chandle)
             assert_pico2000_ok(status["close_unit"])
+        except:
+            pass
+
+        try:
+            INFLUXDB_CLIENT.close()
         except:
             pass
 

@@ -1,7 +1,6 @@
 # user gitignore
-run_TC08logger.ps1
-Startup_ubuntu
-Startup_ubuntu.desktop
+settings.toml
+imaq_config/
 
 
 # gitignore for vscode as of 2024/12/05

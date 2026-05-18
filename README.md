@@ -10,10 +10,9 @@ Periodically read temps and upload it to Sr group's InfluxDB
 - PicoLog TC-08 thermocouple logger and thermocouples
 - [`uv`](https://docs.astral.sh/uv/getting-started/installation/) Python project manager
 - Access to the target InfluxDB bucket
+- Access to the private [`imaq_config`](https://github.com/SinclairQuantumLab/imaq_config) repository used by this app
 - TC-08 logger info:
   - Serial number
-  - Channel configuration
-  - Measurement period
 
 ## Initial setup
 
@@ -54,24 +53,25 @@ Periodically read temps and upload it to Sr group's InfluxDB
 5. Clone this repo:
 
     ```bash
-    git clone https://github.com/SinclairQuantumLab/pico-tc08-influxdb.git
-    cd pico-tc08-influxdb/
+    git clone https://github.com/SinclairQuantumLab/pico-tc08-to-influxdb.git
+    cd pico-tc08-to-influxdb/
     ```
 
-6. Run `uv sync` to install this app.
+6. Clone the private `imaq_config` repo into this repo's `imaq_config` folder for InfluxDB info.
+
+    ```bash
+    git clone https://github.com/SinclairQuantumLab/imaq_config.git
+    ```
+
+    The local folder name should be `imaq_config`, and `imaq_config/auth.toml` should exist before running `main.py`.
+
+7. Run `uv sync` to install this app.
 
     ```bash
     uv sync
     ```
 
-    This installs packages from `pyproject.toml` and `uv.lock`, including `influxdb-client` and the Python package imported as `picosdk`.
-
-    - The PicoSDK C libraries from Step 1 are still required for hardware access.
-    - If `picosdk.errors.CannotFindPicoSDKError` appears, the Python wrapper is installed but the PicoSDK C library is not visible on the system path. Install the PicoSDK C libraries, then close and reopen the terminal.
-    - If Raspberry Pi 3B+ is used, prefer the system Python with a local virtual environment, for example `uv venv --python python3`.
-    - The 64-bit ARM architecture (aarch64) for Raspberry Pi 4B is not supported by Pico Technology (as of 2023/10/22; see <https://www.picotech.com/support/viewtopic.php?t=42162>)
-
-7. Try running `picotest.py` to check if picosdk successfully read the temperature from the logger.
+8. Try running `picotest.py` to check if picosdk successfully read the temperature from the logger.
 
     ```bash
     uv run picotest.py
@@ -88,25 +88,47 @@ Periodically read temps and upload it to Sr group's InfluxDB
     <__main__.c_float_Array_9 object at 0x000001B1AFA1E760>
     ```
 
-8. Open `main.py` and setup `assingment` dict variable to assign `Location` (description of where the temp is being measured) and `Channel` (TC-08 logger's channel #) of temp measurements. Set measurement period to `period` variable with the unit of second.
+9. Copy `settings.toml.template` to `settings.toml` and configure the measurement for this the TC-08 session.
 
-9. Try running `main.py` script by pressing `F5` key, or using `uv run`, to check if the app runs as it should.
+    ```bash
+    cp settings.toml.template settings.toml
+    ```
+
+    Query the connected TC-08 device serial number:
+
+    ```bash
+    uv run query_device_sn.py
+    ```
+
+    Open `settings.toml` and set:
+
+    - `sn`: TC-08 serial number
+    - `period_s`: measurement period in seconds
+    - `channels`: active TC-08 channels and InfluxDB channel names
+    - `enable_logging`: whether to write local log files
+    - log file names, if the defaults should be changed
+
+10. Try running `main.py` script to check if the app runs as it should.
 
     ```bash
     uv run main.py
     ```
 
-10. Check if a relevant way to start up the app in the next section works.
+    To use a specific configuration file:
+
+    ```bash
+    uv run main.py settings_AC161_246.toml
+    ```
+
+11. Check if a relevant way to start up the app in the next section works.
 
 ## Starting app
 
 ### Windows
 
 1. Run `uv sync` once in the project root so `.venv` exists.
-2. Copy and rename `./run_TC08logger.ps1.bak` to `./run_TC08logger.ps1`
-3. Open the `./run_TC08logger.ps1` script file and update the placeholder:
-    - `$host.ui.RawUI.WindowTitle = "##Type here the desired title of the console; see README.md##"`
-4. Run (doubleclick) `.\Startup_windows.lnk` shortcut file. If the `.lnk` file is moved/copied out of the software folder (with `main.py`), change the `Start in` value from `%CD` to the absolute path of the software folder (e.g., `"%USERPROFILE%\PicoLog TC-80 temp logging\TC08logger"`) in the Properties setting below:
+2. Run (doubleclick) `.\Startup.lnk` shortcut file. If the `.lnk` file is moved/copied out of the software folder (with `main.py`), change the `Start in` value from `%CD` to the absolute path of the software folder (e.g., `"%USERPROFILE%\PicoLog TC-80 temp logging\TC08logger"`) in the Properties setting below:
+3. To use a specific configuration file, add the settings file path after `Startup.ps1` in the shortcut command line.
 ![image](windows-lnk-setting.jpg)
 
 Tested for Windows 11.
@@ -141,41 +163,18 @@ Go to *Activity* dashboard and click *TC08logger* icon that is to be made by the
 
 Tested for Ubuntu 24.04.
 
-## Autostart setting at OS startup
-
-### Windows
-
-Modify the `.\Startup_windows.lnk` following [this section](#windows).
-Copy the `.lnk` file to `%USERPROFILE%\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Startup`.
-
-Tested for Windows 11.
-
-### Linux
-
-Using *Startup Applications Properties* GUI application.
-Refer to <https://help.ubuntu.com/stable/ubuntu-help/startup-applications.html.en>.
-
-1. Open gnome-session-properties GUI by one of the following ways:
-    - Open *Activity* dashboard and search for *Startup Applications Properties*
-    - Press Alt+F2 and run `gnome-session-properties`
-2. Click *Add* button and populate the blanks as follows:
-    - Name: TC08logger
-    - Command: ##type the absolute path to the (renamed) copy of `Startup_ubuntu` script file## (e.g.,/home/korra/Startup_ubuntu_TC08logger)
-    - Comment: Pico Logger TC-08 read & upload to Grafana's Influx DB
-    ![image](ubuntu-startup-application-setting.png)
-3. Click *Save* button.
-
-Tested for Ubuntu 24.04.
-
 ## Use
 
 It will start reading temps, print in stdout, and uploading to Grafana's DB periodically.
 
 ## Developer's notes
 
+
 - Files for initial setup are from the SDK example folder (../picosdk-python-wrappers-master/)
   - setup.py, .gitignore files and picosdk/ folder were copied here as-is.
   - README.md was copied as README_SDK.md and a corresponding change was made in setup.py (see top comments as a release note therein)
-- main.py is the entry point and contain all the essential codes.
+- main.py is the entry point and contains the TC-08 read loop and InfluxDB upload logic.
+- `settings.toml` contains the local TC-08 session configuration and is ignored by git.
+- `imaq_config/auth.toml` contains shared InfluxDB credentials and is ignored by git.
 - The codes are developed from the TC-08 SINGLE MODE EXAMPLE in the SDK folder (../picosdk-python-wrappers-master/usbtc08Examples/tc08SingleModeExample.py).
 - `pyproject.toml`, `uv.lock`, and `.python-version` are used for the current `uv` workflow.
