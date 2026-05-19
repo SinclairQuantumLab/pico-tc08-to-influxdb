@@ -127,9 +127,12 @@ Periodically read temps and upload it to Sr group's InfluxDB
 ### Windows
 
 1. Run `uv sync` once in the project root so `.venv` exists.
-2. Run (doubleclick) `.\Startup.lnk` shortcut file. If the `.lnk` file is moved/copied out of the software folder (with `main.py`), change the `Start in` value from `%CD` to the absolute path of the software folder (e.g., `"%USERPROFILE%\PicoLog TC-80 temp logging\TC08logger"`) in the Properties setting below:
+2. Run (double-click) `.\Startup.lnk` shortcut file from the project folder.
 3. To use a specific configuration file, add the settings file path after `Startup.ps1` in the shortcut command line.
-![image](windows-lnk-setting.jpg)
+
+    ```powershell
+    -ExecutionPolicy Bypass -File Startup.ps1 settings_AC161_246.toml
+    ```
 
 Tested for Windows 11.
 
