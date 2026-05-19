@@ -129,11 +129,10 @@ Periodically read temps and upload it to Sr group's InfluxDB
 
 ### Windows
 
-1. Run (double-click) `.\Startup.lnk` shortcut file from the project folder.
+1. Copy and rename `Startup.lnk.template` to a `.lnk` file for the TC-08 logger (e.g., `Startup_pico_tc08.lnk`) in the same folder (i.e., the root folder).
 2. To use a specific configuration file, make one `.lnk` file for each settings file.
-    1. Copy and rename `Startup.lnk` (e.g., `Startup_A0194_559.lnk`).
-    2. Right-click the `.lnk` file and select **Properties**.
-    3. In the **Shortcut** tab, update **Target** using absolute paths.
+    1. Right-click the `.lnk` file and select **Properties**.
+    2. In the **Shortcut** tab, update **Target** using absolute paths.
 
     ```powershell
     C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File "<PROJECT DIR>\Startup.ps1" "<SETTINGS FILE>"
@@ -144,6 +143,7 @@ Periodically read temps and upload it to Sr group's InfluxDB
     - `<SETTINGS FILE>`: `settings_XX.toml` settings file to pass to `Startup.ps1`
 
     Do not leave the `<...>` placeholders in the `.lnk` target. `Startup.ps1` reads `sn` from `<SETTINGS FILE>` and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the PowerShell window size, edit `$terminalColumns`, `$terminalRows`, and `$terminalBufferRows` near the top of `Startup.ps1`.
+3. Run (double-click) the `.lnk` shortcut file.
 
 Tested for Windows 11.
 

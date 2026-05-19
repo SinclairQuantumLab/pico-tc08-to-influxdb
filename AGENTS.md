@@ -21,7 +21,7 @@ Primary runtime files:
 - `settings.toml.template`: tracked template for `settings.toml`.
 - `imaq_config/auth.toml`: local, ignored credentials/config from the private `imaq_config` repo.
 - `query_device_sn.py`: utility to print connected TC-08 batch/serial numbers.
-- `Startup.ps1` and `Startup.lnk`: Windows startup path.
+- `Startup.ps1` and `Startup.lnk.template`: Windows startup path.
 - `Startup_bash` and `Startup_ubuntu_pico_tc08.desktop.template`: Linux/Ubuntu startup path.
 
 ## Repo And Git State
@@ -34,7 +34,7 @@ Primary runtime files:
 
 - The repo was renamed from `pico-tc08-influxdb`; update any old references if they reappear.
 - Recent work moved the project to `uv`, externalized session settings, added the `imaq_config` dependency, renamed Windows startup files, added the serial-number query utility, added startup config forwarding, and removed old setup/test/template leftovers.
-- `settings*.toml` and `imaq_config/` are ignored and should stay local.
+- `settings*.toml`, generated `*.lnk`, generated `*.desktop`, and `imaq_config/` are ignored and should stay local.
 
 ## User Preferences And Workflow
 
@@ -145,7 +145,7 @@ TC-08 #1: A0194/559
 
 Windows:
 
-- Current tracked names are `Startup.ps1` and `Startup.lnk`.
+- Current tracked names are `Startup.ps1` and `Startup.lnk.template`.
 - Old names `run_TC08logger.ps1.bak` and `Startup_windows.lnk` were retired.
 - `Startup.ps1` changes to its own directory, checks `.venv\Scripts\python.exe`, then runs `main.py`.
 - Any arguments passed to `Startup.ps1` are forwarded to `main.py`, so a config file can be passed through the shortcut.
@@ -171,7 +171,7 @@ Important README behavior to preserve:
 - Setup includes cloning private `imaq_config` into `imaq_config/`.
 - Setup includes copying `settings.toml.template` to `settings.toml`.
 - Setup includes running `query_device_sn.py` before setting `sn`.
-- Windows startup instructions should use an absolute `<PROJECT DIR>\Startup.ps1` target path and should not mention the old `%CD%` / `Start in` screenshot flow.
+- Windows startup instructions should tell users to copy `Startup.lnk.template` to a local `.lnk`, use an absolute `<PROJECT DIR>\Startup.ps1` target path, and not mention the old `%CD%` / `Start in` screenshot flow.
 - Linux startup instructions should use `Startup_bash` plus `Startup_ubuntu_pico_tc08.desktop.template`; do not reintroduce the old `Startup_ubuntu.bak` wrapper.
 
 ## Verification Commands

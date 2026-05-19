@@ -1,6 +1,8 @@
 # user gitignore
 settings*.toml
 imaq_config/
+*.desktop
+*.lnk
 
 
 # gitignore for vscode as of 2024/12/05
