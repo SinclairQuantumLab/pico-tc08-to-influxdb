@@ -129,20 +129,13 @@ Periodically read temps and upload it to Sr group's InfluxDB
 
 ### Windows
 
-1. Copy and rename `Startup.lnk.template` to a `.lnk` file for the TC-08 logger (e.g., `Startup_pico_tc08.lnk`) in the same folder (i.e., the root folder).
+1. Copy and rename `Startup.lnk.template` to a `.lnk` file.
 2. To use a specific configuration file, make one `.lnk` file for each settings file.
     1. Right-click the `.lnk` file and select **Properties**.
-    2. In the **Shortcut** tab, update **Target** using absolute paths.
-
-    ```powershell
-    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File "<PROJECT DIR>\Startup.ps1" "<SETTINGS FILE>"
-    ```
-
-    Update the placeholders:
-    - `<PROJECT DIR>`: absolute path to this project folder
-    - `<SETTINGS FILE>`: `settings_XX.toml` settings file to pass to `Startup.ps1`
-
-    Do not leave the `<...>` placeholders in the `.lnk` target. `Startup.ps1` reads `sn` from `<SETTINGS FILE>` and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the PowerShell window size, edit `$terminalColumns`, `$terminalRows`, and `$terminalBufferRows` near the top of `Startup.ps1`.
+    2. Go to the **Shortcut** tab and update the settings as needed.
+        - In **Target**: to use a different configuration file, replace `settings.toml` with the settings file to pass to `Startup.ps1` (e.g., `settings_XX.toml`).
+        - When the `.lnk` file is moved outside the project folder, set **Start in** to the absolute path of this project folder `<PROJECT DIR>`.
+        - (Optional) click **Change Icon...** and set it to `<PROJECT DIR>\icon.ico`.
 3. Run (double-click) the `.lnk` shortcut file.
 
 Tested for Windows 11.
@@ -162,10 +155,10 @@ Go to *Activity* dashboard and click *TC08logger* icon that is to be made by the
 3. Open the `.desktop` file in a text editor and update every placeholder wrapped in `<...>`.
     - `<SN>`: TC-08 serial number or another short label shown in *Activity*
     - `<PROJECT DIR>`: absolute path to this project folder
-    - `<SETTINGS FILE>`: `settings_XX.toml` settings file to pass to `Startup_bash`
+    - `settings.toml`: settings file to pass to `Startup_bash`; replace it with another settings file if needed (e.g., `settings_XX.toml`)
 
     Do not leave the `<...>` placeholders in the installed `.desktop` file.
-    `Startup_bash` reads `sn` from `<SETTINGS FILE>` and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the terminal window size, edit `terminal_columns` and `terminal_rows` near the top of `Startup_bash`.
+    `Startup_bash` reads `sn` from the selected settings file and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the terminal window size, edit `terminal_columns` and `terminal_rows` near the top of `Startup_bash`.
 
 4. Run `sudo desktop-file-install ./Startup_ubuntu_pico_tc08.desktop` and see if the icon shows up in *Activity* (the dashboard that pops up when clicking the left bottom Ubuntu icon).
 5. Click and see if a terminal pops up and starts recording temperatures.

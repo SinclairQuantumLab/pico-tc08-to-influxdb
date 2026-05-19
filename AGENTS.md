@@ -150,6 +150,7 @@ Windows:
 - `Startup.ps1` changes to its own directory, checks `.venv\Scripts\python.exe`, then runs `main.py`.
 - Any arguments passed to `Startup.ps1` are forwarded to `main.py`, so a config file can be passed through the shortcut.
 - `Startup.ps1` reads `sn` from the selected settings file, sets the terminal title to `Pico TC-08 logger (SN: XX)`, and exposes `$terminalColumns`, `$terminalRows`, and `$terminalBufferRows` near the top for window sizing.
+- `Startup.ps1` waits for Enter before closing if startup fails or `main.py` exits with a nonzero code.
 
 Linux:
 
@@ -171,7 +172,7 @@ Important README behavior to preserve:
 - Setup includes cloning private `imaq_config` into `imaq_config/`.
 - Setup includes copying `settings.toml.template` to `settings.toml`.
 - Setup includes running `query_device_sn.py` before setting `sn`.
-- Windows startup instructions should tell users to copy `Startup.lnk.template` to a local `.lnk`, use an absolute `<PROJECT DIR>\Startup.ps1` target path, and not mention the old `%CD%` / `Start in` screenshot flow.
+- Windows startup instructions should tell users to copy `Startup.lnk.template` to a local `.lnk`, use `Startup.ps1` in the target, keep **Start in** blank while the `.lnk` stays in the project folder, and set **Start in** to `<PROJECT DIR>` if the `.lnk` is moved outside the project folder.
 - Linux startup instructions should use `Startup_bash` plus `Startup_ubuntu_pico_tc08.desktop.template`; do not reintroduce the old `Startup_ubuntu.bak` wrapper.
 
 ## Verification Commands

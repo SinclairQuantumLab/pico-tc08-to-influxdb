@@ -11,6 +11,14 @@ $pyArgs = $args
 $terminalColumns = 140
 $terminalRows = 30
 $terminalBufferRows = 3000
+$pauseOnError = $true
+
+function Wait-BeforeClosingOnError {
+    if ($pauseOnError) {
+        Write-Host ""
+        Read-Host "Press Enter to close this window"
+    }
+}
 
 function Get-TomlSN {
     param([string]$Path)
@@ -54,6 +62,18 @@ function Set-TerminalLayout {
     }
 }
 
+trap {
+    Write-Host ""
+    Write-Host "Startup.ps1 failed before or during app launch."
+    Write-Host $_.Exception.Message
+    if ($_.ScriptStackTrace) {
+        Write-Host ""
+        Write-Host $_.ScriptStackTrace
+    }
+    Wait-BeforeClosingOnError
+    exit 1
+}
+
 # move working directory to the project folder
 Write-Host ">>> cd to the project directory..."
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
@@ -92,5 +112,10 @@ $exitCode = $LASTEXITCODE
 
 Write-Host ""
 Write-Host "<<< End of the script: $pyPath"
+
+if ($exitCode -ne 0) {
+    Write-Host "main.py exited with code $exitCode."
+    Wait-BeforeClosingOnError
+}
 
 exit $exitCode
