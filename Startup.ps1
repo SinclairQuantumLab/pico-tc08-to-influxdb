@@ -7,11 +7,70 @@ $ErrorActionPreference = "Stop"
 $pyPath = ".\main.py"
 $pyArgs = $args
 
+# terminal window options
+$terminalColumns = 140
+$terminalRows = 30
+$terminalBufferRows = 3000
+
+function Get-TomlSN {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return $null
+    }
+
+    foreach ($line in Get-Content -LiteralPath $Path) {
+        if ($line -match '^\s*sn\s*=\s*["'']?([^"'']+)["'']?\s*(#.*)?$') {
+            return $Matches[1].Trim()
+        }
+    }
+
+    return $null
+}
+
+function Set-TerminalLayout {
+    param(
+        [string]$Title,
+        [int]$Columns,
+        [int]$Rows,
+        [int]$BufferRows
+    )
+
+    try {
+        $Host.UI.RawUI.WindowTitle = $Title
+
+        if ($Columns -le 0 -or $Rows -le 0) {
+            return
+        }
+
+        $rawUI = $Host.UI.RawUI
+        $bufferWidth = [Math]::Max($Columns, $rawUI.BufferSize.Width)
+        $bufferHeight = [Math]::Max([Math]::Max($BufferRows, $Rows), $rawUI.BufferSize.Height)
+        $rawUI.BufferSize = New-Object System.Management.Automation.Host.Size -ArgumentList $bufferWidth, $bufferHeight
+        $rawUI.WindowSize = New-Object System.Management.Automation.Host.Size -ArgumentList $Columns, $Rows
+    }
+    catch {
+        Write-Host "Warning: Could not update terminal title/size: $($_.Exception.Message)"
+    }
+}
+
 # move working directory to the project folder
 Write-Host ">>> cd to the project directory..."
 $scriptDir = Split-Path -Parent $MyInvocation.MyCommand.Path
 Set-Location $scriptDir
 Write-Host "<<< Working directory set to: $PWD"
+Write-Host ""
+
+# set terminal title and size
+$settingsPath = if ($pyArgs.Count -gt 0) { [string]$pyArgs[0] } else { ".\settings.toml" }
+$sn = Get-TomlSN -Path $settingsPath
+if ([string]::IsNullOrWhiteSpace($sn)) {
+    $sn = "unknown"
+}
+$terminalTitle = "Pico TC-08 logger (SN: $sn)"
+Set-TerminalLayout -Title $terminalTitle -Columns $terminalColumns -Rows $terminalRows -BufferRows $terminalBufferRows
+Write-Host "Terminal title = $terminalTitle"
+Write-Host "Terminal size = ${terminalColumns}x${terminalRows}"
 Write-Host ""
 
 # use the local virtual environment created by uv

@@ -22,7 +22,7 @@ Primary runtime files:
 - `imaq_config/auth.toml`: local, ignored credentials/config from the private `imaq_config` repo.
 - `query_device_sn.py`: utility to print connected TC-08 batch/serial numbers.
 - `Startup.ps1` and `Startup.lnk`: Windows startup path.
-- `Startup_bash`, `Startup_ubuntu.bak`, and `Startup_ubuntu.desktop.bak`: Linux/Ubuntu startup path.
+- `Startup_bash` and `Startup_ubuntu_pico_tc08.desktop.template`: Linux/Ubuntu startup path.
 
 ## Repo And Git State
 
@@ -33,8 +33,8 @@ Primary runtime files:
   ```
 
 - The repo was renamed from `pico-tc08-influxdb`; update any old references if they reappear.
-- Recent work moved the project to `uv`, externalized session settings, added the `imaq_config` dependency, renamed Windows startup files, and added the serial-number query utility.
-- `settings.toml` and `imaq_config/` are ignored and should stay local.
+- Recent work moved the project to `uv`, externalized session settings, added the `imaq_config` dependency, renamed Windows startup files, added the serial-number query utility, added startup config forwarding, and removed old setup/test/template leftovers.
+- `settings*.toml` and `imaq_config/` are ignored and should stay local.
 
 ## User Preferences And Workflow
 
@@ -62,7 +62,7 @@ Primary runtime files:
   uv run picotest.py
   uv run query_device_sn.py
   uv run main.py
-  uv run main.py settings_AC161_246.toml
+  uv run main.py settings_XX.toml
   ```
 
 - Hardware access requires the PicoSDK C libraries to be installed separately. If the wrapper is installed but the native library is not visible, errors such as `picosdk.errors.CannotFindPicoSDKError: PicoSDK (usbtc08) not found, check PATH` can occur.
@@ -139,7 +139,7 @@ Known successful output during this thread:
 TC-08 #1: A0194/559
 ```
 
-`main.py` currently does not verify the connected device against `sn`; it only uses `sn` as an InfluxDB tag. A future improvement could query the connected serial in `main.py` and fail or warn if it differs from `settings.toml`.
+`main.py` now scans connected TC-08 loggers, selects the device whose batch/serial string matches `sn`, and raises `TC08SNNotFoundError` if no connected device matches `settings.toml`.
 
 ## Startup Scripts
 
@@ -149,11 +149,15 @@ Windows:
 - Old names `run_TC08logger.ps1.bak` and `Startup_windows.lnk` were retired.
 - `Startup.ps1` changes to its own directory, checks `.venv\Scripts\python.exe`, then runs `main.py`.
 - Any arguments passed to `Startup.ps1` are forwarded to `main.py`, so a config file can be passed through the shortcut.
+- `Startup.ps1` reads `sn` from the selected settings file, sets the terminal title to `Pico TC-08 logger (SN: XX)`, and exposes `$terminalColumns`, `$terminalRows`, and `$terminalBufferRows` near the top for window sizing.
 
 Linux:
 
-- Current tracked names remain `Startup_bash`, `Startup_ubuntu.bak`, and `Startup_ubuntu.desktop.bak`.
-- The Linux section of `README.md` may still reflect the original Ubuntu startup flow. Be careful if changing it; the user has not asked to rename the Linux files yet.
+- `Startup_bash` changes to its own directory, checks `.venv/bin/python`, then runs `main.py`.
+- Any arguments passed to `Startup_bash` are forwarded to `main.py`, so a config file can be passed through the `.desktop` file.
+- `Startup_bash` reads `sn` from the selected settings file, sets the terminal title to `Pico TC-08 logger (SN: XX)`, and exposes `terminal_columns` and `terminal_rows` near the top for window sizing.
+- `Startup_ubuntu_pico_tc08.desktop.template` is the tracked Ubuntu desktop-entry template. It calls `Startup_bash` directly.
+- The old intermediate `Startup_ubuntu.bak` wrapper was removed.
 
 ## README Notes
 
@@ -167,7 +171,8 @@ Important README behavior to preserve:
 - Setup includes cloning private `imaq_config` into `imaq_config/`.
 - Setup includes copying `settings.toml.template` to `settings.toml`.
 - Setup includes running `query_device_sn.py` before setting `sn`.
-- Windows startup instructions should not mention the old `%CD%` / `Start in` screenshot flow.
+- Windows startup instructions should use an absolute `<PROJECT DIR>\Startup.ps1` target path and should not mention the old `%CD%` / `Start in` screenshot flow.
+- Linux startup instructions should use `Startup_bash` plus `Startup_ubuntu_pico_tc08.desktop.template`; do not reintroduce the old `Startup_ubuntu.bak` wrapper.
 
 ## Verification Commands
 
@@ -187,9 +192,3 @@ uv run query_device_sn.py
 ```
 
 `main.py` will write to InfluxDB, so be deliberate when running it.
-
-## Known Follow-Ups
-
-- Consider adding serial-number verification in `main.py` using the helper logic from `query_device_sn.py`.
-- Consider whether `settings copy.toml` should stay tracked; it currently mirrors the template, but real local settings should normally remain untracked.
-- Consider whether `windows-lnk-setting.jpg` is still needed after the Windows startup README cleanup.

@@ -100,9 +100,12 @@ Periodically read temps and upload it to Sr group's InfluxDB
     uv run query_device_sn.py
     ```
 
+    It will print the SN of all the devices connected to the computer.
+    Confirm the SNs with the ones labeled on the rear side of the devices.
+
     Open `settings.toml` and set:
 
-    - `sn`: TC-08 serial number
+    - `sn`: TC-08 serial number found above
     - `period_s`: measurement period in seconds
     - `channels`: active TC-08 channels and InfluxDB channel names
     - `enable_logging`: whether to write local log files
@@ -114,10 +117,10 @@ Periodically read temps and upload it to Sr group's InfluxDB
     uv run main.py
     ```
 
-    To use a specific configuration file:
+    To use a specific configuration file, provide its path as like the example below:
 
     ```bash
-    uv run main.py settings_AC161_246.toml
+    uv run main.py settings_XX.toml
     ```
 
 11. Check if a relevant way to start up the app in the next section works.
@@ -126,13 +129,21 @@ Periodically read temps and upload it to Sr group's InfluxDB
 
 ### Windows
 
-1. Run `uv sync` once in the project root so `.venv` exists.
-2. Run (double-click) `.\Startup.lnk` shortcut file from the project folder.
-3. To use a specific configuration file, add the settings file path after `Startup.ps1` in the shortcut command line.
+1. Run (double-click) `.\Startup.lnk` shortcut file from the project folder.
+2. To use a specific configuration file, make one `.lnk` file for each settings file.
+    1. Copy and rename `Startup.lnk` (e.g., `Startup_A0194_559.lnk`).
+    2. Right-click the `.lnk` file and select **Properties**.
+    3. In the **Shortcut** tab, update **Target** using absolute paths.
 
     ```powershell
-    -ExecutionPolicy Bypass -File Startup.ps1 settings_AC161_246.toml
+    C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe -ExecutionPolicy Bypass -File "<PROJECT DIR>\Startup.ps1" "<SETTINGS FILE>"
     ```
+
+    Update the placeholders:
+    - `<PROJECT DIR>`: absolute path to this project folder
+    - `<SETTINGS FILE>`: `settings_XX.toml` settings file to pass to `Startup.ps1`
+
+    Do not leave the `<...>` placeholders in the `.lnk` target. `Startup.ps1` reads `sn` from `<SETTINGS FILE>` and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the PowerShell window size, edit `$terminalColumns`, `$terminalRows`, and `$terminalBufferRows` near the top of `Startup.ps1`.
 
 Tested for Windows 11.
 
@@ -140,29 +151,29 @@ Tested for Windows 11.
 
 Go to *Activity* dashboard and click *TC08logger* icon that is to be made by the following procedure:
 
-1. Run `uv sync` once in the project root so `.venv` exists.
-2. Grant excecutable permission to `./Startup_bash` and `./Startup_ubuntu` files by running the below line in a terminal.
+1. Grant excecutable permission to `./Startup_bash` by running the below line in a terminal.
 
-```bash
+    ```bash
     cd <root folder path>
-    chmod +x ./Startup_bash ./Startup_ubuntu
-```
+    chmod +x ./Startup_bash
+    ```
 
-1. Copy and rename `./Startup_ubuntu.bak` to `./Startup_ubuntu` and `./Startup_ubuntu.desktop.bak` to `./Startup_ubuntu_<a unique name>.desktop` (e.g., `./Startup_ubuntu_TC08logger.desktop`) in the same folder (i.e., the root folder).
-2. Open the `Startup_ubuntu` script file and update the placeholders
-    - `DIR_TC08LOGGER="##type here the path to the project folder; see README.md##"`
-    - `gnome-terminal --title="##Type here the desired title of the terminal##" -- bash -i -c "$STR_CMD"`
-3. Open the `.desktop` file in a text editer and update the placeholders
-    - `Name=##Type here the desired name of the icon; see README.md##`
-    - `Exec=##Add here the path of the app's root folder see README.md##/Startup_ubuntu`
-    - `Icon=##Add here the path of the app's root folder see README.md##/icon.png`
-4. Run `sudo desktop-file-install ./Startup_ubuntu_<custom name>.desktop` and see if the icon shows up in *Activity* (the dashboard that pops up when clicking the left bottom Ubuntu icon).
-5. Click and see if a terminal pops up with title set in Step 3 and start recording temperatures.
-6. In case the `.desktop` file has to be updated & re-installed, remove the installed `.desktop` file in `/etc/share/applications/` folder as a super user by running the below command line. Then, open *Activity* dashboard, and see if the ion has disappeared or disappear in a few seconds. After the ion is removed, install the edited `.desktop` again, following Steps 4 and 5.
+2. Copy and rename `./Startup_ubuntu_pico_tc08.desktop.template` to a `.desktop` file for the TC-08 logger (e.g., `./Startup_ubuntu_pico_tc08.desktop`) in the same folder (i.e., the root folder).
+3. Open the `.desktop` file in a text editor and update every placeholder wrapped in `<...>`.
+    - `<SN>`: TC-08 serial number or another short label shown in *Activity*
+    - `<PROJECT DIR>`: absolute path to this project folder
+    - `<SETTINGS FILE>`: `settings_XX.toml` settings file to pass to `Startup_bash`
 
-```bash
-    sudo rm /etc/share/applications/Startup_ubuntu_<custom name>.desktop
-```
+    Do not leave the `<...>` placeholders in the installed `.desktop` file.
+    `Startup_bash` reads `sn` from `<SETTINGS FILE>` and sets the terminal title to `Pico TC-08 logger (SN: XX)`. To adjust the terminal window size, edit `terminal_columns` and `terminal_rows` near the top of `Startup_bash`.
+
+4. Run `sudo desktop-file-install ./Startup_ubuntu_pico_tc08.desktop` and see if the icon shows up in *Activity* (the dashboard that pops up when clicking the left bottom Ubuntu icon).
+5. Click and see if a terminal pops up and starts recording temperatures.
+6. In case the `.desktop` file has to be updated & re-installed, remove the installed `.desktop` file in `/etc/share/applications/` folder as a super user by running the below command line. Then, open *Activity* dashboard, and see if the icon has disappeared or disappear in a few seconds. After the icon is removed, install the edited `.desktop` again, following Steps 5 and 6.
+
+    ```bash
+    sudo rm /etc/share/applications/Startup_ubuntu_pico_tc08.desktop
+    ```
 
 Tested for Ubuntu 24.04.
 
@@ -172,11 +183,8 @@ It will start reading temps, print in stdout, and uploading to Grafana's DB peri
 
 ## Developer's notes
 
-
-- Files for initial setup are from the SDK example folder (../picosdk-python-wrappers-master/)
-  - setup.py, .gitignore files and picosdk/ folder were copied here as-is.
-  - README.md was copied as README_SDK.md and a corresponding change was made in setup.py (see top comments as a release note therein)
 - main.py is the entry point and contains the TC-08 read loop and InfluxDB upload logic.
+- `picotest.py` is a lightweight TC-08 hardware smoke test developed from the SDK single-mode example.
 - `settings.toml` contains the local TC-08 session configuration and is ignored by git.
 - `imaq_config/auth.toml` contains shared InfluxDB credentials and is ignored by git.
 - The codes are developed from the TC-08 SINGLE MODE EXAMPLE in the SDK folder (../picosdk-python-wrappers-master/usbtc08Examples/tc08SingleModeExample.py).

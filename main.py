@@ -16,6 +16,13 @@ import sys
 import tomllib
 from typing import Any
 
+USBTC08LINE_BATCH_AND_SERIAL = 4
+
+
+class TC08SNNotFoundError(RuntimeError):
+    """Raised when the configured TC-08 serial number is not connected."""
+
+
 # >>>>> app configuration >>>>>
 if len(sys.argv) > 2:
     raise SystemExit("Usage: uv run main.py [settings.toml]")
@@ -70,6 +77,64 @@ print()
 # <<< InfluxDB configuration <<<
 
 
+def get_tc08_sn(handle: int) -> str:
+    """Return the batch/serial string for an opened TC-08 device handle."""
+    buffer = ctypes.create_string_buffer(80)
+    status = tc08.usb_tc08_get_unit_info2(
+        handle,
+        ctypes.byref(buffer),
+        ctypes.sizeof(buffer),
+        USBTC08LINE_BATCH_AND_SERIAL,
+    )
+    assert_pico2000_ok(status)
+    return buffer.value.decode("ascii", errors="replace").strip()
+
+
+def close_tc08_handle(handle: int) -> None:
+    """Close a TC-08 device handle and assert the PicoSDK return status."""
+    status = tc08.usb_tc08_close_unit(handle)
+    assert_pico2000_ok(status)
+
+
+def open_configured_tc08(expected_sn: str) -> int:
+    """Open the connected TC-08 whose batch/serial string matches expected_sn."""
+    handles: list[int] = []
+    connected_sns: list[str] = []
+
+    try:
+        while True:
+            handle = tc08.usb_tc08_open_unit()
+            if handle == 0:
+                break
+            if handle < 0:
+                assert_pico2000_ok(handle)
+                raise RuntimeError(f"Could not open TC-08 logger. Error code: {handle}")
+
+            handles.append(handle)
+            device_sn = get_tc08_sn(handle)
+            connected_sns.append(device_sn)
+            print(f"Found TC-08 logger SN = {device_sn}.")
+
+            if device_sn == expected_sn:
+                for other_handle in handles[:-1]:
+                    close_tc08_handle(other_handle)
+                return handle
+
+        found = ", ".join(connected_sns) if connected_sns else "none"
+        raise TC08SNNotFoundError(
+            f"TC-08 logger SN '{expected_sn}' is not connected. "
+            f"Connected TC-08 logger SNs: {found}."
+        )
+
+    except Exception:
+        for handle in handles:
+            try:
+                close_tc08_handle(handle)
+            except Exception:
+                pass
+        raise
+
+
 def main():
     # Create chandle and status ready for use
     chandle = ctypes.c_int16()
@@ -77,16 +142,11 @@ def main():
 
     try:
         # open unit
-        print(f"Connecting to a TC-08 logger...")
-        status["open_unit"] = tc08.usb_tc08_open_unit()
-        assert_pico2000_ok(status["open_unit"])
+        print(f"Connecting to TC-08 logger SN = {SN}...")
+        status["open_unit"] = open_configured_tc08(SN)
         chandle = ctypes.c_int16(status["open_unit"])
 
-        if status["open_unit"] != 1:  # 1 means USBTC08_OK in the Pico status codes
-            raise Exception(
-                f"Error: Could not open device. Error code: {status['open_unit']}\n\tcf. status=0: no (more) available device to connect.")
-
-        print(f"Connected.")
+        print(f"Connected to TC-08 logger SN = {SN}.")
         print()
 
         # set mains rejection to 60 Hz
@@ -200,6 +260,9 @@ def main():
         if enable_logging:
             with path_log_err.open("a") as f:
                 f.write(exstr + "\n\n")
+
+        if isinstance(ex, TC08SNNotFoundError):
+            raise
 
     finally:
         # close unit

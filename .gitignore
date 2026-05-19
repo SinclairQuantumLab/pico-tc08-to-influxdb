@@ -1,5 +1,5 @@
 # user gitignore
-settings.toml
+settings*.toml
 imaq_config/
 
 
