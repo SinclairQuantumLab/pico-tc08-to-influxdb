@@ -64,6 +64,8 @@ print()
 # >>> load IMAQ config >>>
 with open("imaq_config/auth.toml", "rb") as f:
     AUTH = tomllib.load(f)
+# override the InfluxDB URL in auth.toml with the one for external access
+AUTH["influxdb"]['url'] = "https://influxdb.sinclairnetwork.physics.wisc.edu"
 # <<< load IMAQ config <<<
 
 # >>> InfluxDB configuration >>>
@@ -136,6 +138,9 @@ def open_configured_tc08(expected_sn: str) -> int:
 
 
 def main():
+    # add 0: "cold junction" to channels dict for easier handling in the measurement loop
+    channels[0] = "Cold Junction"
+
     # Create chandle and status ready for use
     chandle = ctypes.c_int16()
     status = {}  # dict to store status of device oprations; see the usages below
@@ -158,9 +163,9 @@ def main():
         # therocouples types and int8 equivalent
         # B=66 , E=69 , J=74 , K=75 , N=78 , R=82 , S=83 , T=84 , ' '=32 , X=88
         typeK = ctypes.c_int8(75)
-        for channel in channels:
+        for channel_num in channels:
             status["set_channel"] = tc08.usb_tc08_set_channel(
-                chandle, channel, typeK)
+                chandle, channel_num, typeK)
             assert_pico2000_ok(status["set_channel"])
 
         # get minimum sampling interval in ms
@@ -189,8 +194,8 @@ def main():
                 # print & log data
                 datetimestr = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
                 measstr = f"{datetimestr}: Cold Junction={temp[0]:.02f}"
-                for channel in channels:
-                    measstr += f", Ch{channel}={temp[channel]:.2f}"
+                for channel_num in channels:
+                    measstr += f", Ch{channel_num}={temp[channel_num]:.2f}"
 
                 print(measstr)
 
@@ -202,26 +207,17 @@ def main():
                 # format your data to write to the database server
 
                 records = \
-                    [  # cold junction
-                        {
-                            "measurement": measurement,
-                            "tags": {
-                                "Logger SN": SN,
-                                "Channel": "Cold Junction",
-                            },
-                            "fields": {"Temp[degC]": temp[0]},
-                        }
-                    ] + \
                     [  # channel temperatures
                         {
                             "measurement": measurement,
                             "tags": {
                                 "Logger SN": SN,
-                                "Channel": channel_name,
+                                "Channel number": channel_num,
+                                "Channel name": channel_name,
                             },
-                            "fields": {"Temp[degC]": temp[channel]},
+                            "fields": {"Temp[degC]": temp[channel_num]},
                         }
-                        for channel, channel_name in channels.items()
+                        for channel_num, channel_name in channels.items()
                     ]
 
                 # send the data
