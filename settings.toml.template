@@ -8,11 +8,14 @@ sn = "AC161/246"
 # Measurement period in seconds
 period_s = 15
 
-# InfluxDB measurement name
-measurement = "Pico_TC08"
-
 # Enable logging to local files
 enable_logging = true
+
+# Uploading to InfluxDB
+# Enable upload
+enable_influxdb_upload = true
+# InfluxDB measurement name
+measurement = "Pico_TC08"
 
 # Names of log files
 dirname_log = "./logs/"

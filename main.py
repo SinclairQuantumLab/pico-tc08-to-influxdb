@@ -34,6 +34,7 @@ with open(settings_path, "rb") as f:
 SN = str(SETTINGS["sn"])
 period = float(SETTINGS["period_s"])  # in second
 measurement = str(SETTINGS.get("measurement", "TC08logger"))
+enable_influxdb_upload = bool(SETTINGS.get("enable_influxdb_upload", True))
 channels: dict[int, str] = {
     int(channel): name for channel, name in SETTINGS["channels"].items()
 }
@@ -53,6 +54,7 @@ print(f"TC-08 logger SN = {SN}")
 print(f"Settings file = {settings_path}")
 print(f"Measurement period = {period} s.")
 print(f"Active channels = {list(channels.keys())}.")
+print(f"InfluxDB upload = {'enabled' if enable_influxdb_upload else 'disabled'}.")
 print(f"File logging = {'enabled' if enable_logging else 'disabled'}.")
 if enable_logging:
     print(f"Measurement log = {path_log_meas}")
@@ -62,20 +64,23 @@ print()
 # <<<<< app configuration <<<<<
 
 # >>> load IMAQ config >>>
-with open("imaq_config/auth.toml", "rb") as f:
-    AUTH = tomllib.load(f)
-# override the InfluxDB URL in auth.toml with the one for external access
-AUTH["influxdb"]['url'] = "https://influxdb.sinclairnetwork.physics.wisc.edu"
+if enable_influxdb_upload:
+    with open("imaq_config/auth.toml", "rb") as f:
+        AUTH = tomllib.load(f)
+    # override the InfluxDB URL in auth.toml with the one for external access
+    AUTH["influxdb"]['url'] = "https://influxdb.sinclairnetwork.physics.wisc.edu"
 # <<< load IMAQ config <<<
 
 # >>> InfluxDB configuration >>>
-import influxdb_client
-from influxdb_client.client.write_api import SYNCHRONOUS
-INFLUXDB_CLIENT = influxdb_client.InfluxDBClient(**AUTH["influxdb"])
-INFLUXDB_WRITE_API = INFLUXDB_CLIENT.write_api(write_options=SYNCHRONOUS)
-INFLUXDB_ORG = AUTH["influxdb"]["org"]; INFLUXDB_BUCKET = AUTH["influxdb"]["bucket"]
-print(f"InfluxDB client initialized for org='{INFLUXDB_ORG}', bucket='{INFLUXDB_BUCKET}'.")
-print()
+INFLUXDB_CLIENT = None
+if enable_influxdb_upload:
+    import influxdb_client
+    from influxdb_client.client.write_api import SYNCHRONOUS
+    INFLUXDB_CLIENT = influxdb_client.InfluxDBClient(**AUTH["influxdb"])
+    INFLUXDB_WRITE_API = INFLUXDB_CLIENT.write_api(write_options=SYNCHRONOUS)
+    INFLUXDB_ORG = AUTH["influxdb"]["org"]; INFLUXDB_BUCKET = AUTH["influxdb"]["bucket"]
+    print(f"InfluxDB client initialized for org='{INFLUXDB_ORG}', bucket='{INFLUXDB_BUCKET}'.")
+    print()
 # <<< InfluxDB configuration <<<
 
 
@@ -203,29 +208,30 @@ def main():
                     with path_log_meas.open("a") as f:
                         f.write(measstr + "\n")
 
-                # upload results to InfluxDB
-                # format your data to write to the database server
+                if enable_influxdb_upload:
+                    # upload results to InfluxDB
+                    # format your data to write to the database server
 
-                records = \
-                    [  # channel temperatures
-                        {
-                            "measurement": measurement,
-                            "tags": {
-                                "Logger SN": SN,
-                                "Channel number": channel_num,
-                                "Channel name": channel_name,
-                            },
-                            "fields": {"Temp[degC]": temp[channel_num]},
-                        }
-                        for channel_num, channel_name in channels.items()
-                    ]
+                    records = \
+                        [  # channel temperatures
+                            {
+                                "measurement": measurement,
+                                "tags": {
+                                    "Logger SN": SN,
+                                    "Channel number": channel_num,
+                                    "Channel name": channel_name,
+                                },
+                                "fields": {"Temp[degC]": temp[channel_num]},
+                            }
+                            for channel_num, channel_name in channels.items()
+                        ]
 
-                # send the data
-                INFLUXDB_WRITE_API.write(
-                    bucket=INFLUXDB_BUCKET,
-                    org=INFLUXDB_ORG,
-                    record=records,
-                )
+                    # send the data
+                    INFLUXDB_WRITE_API.write(
+                        bucket=INFLUXDB_BUCKET,
+                        org=INFLUXDB_ORG,
+                        record=records,
+                    )
 
             except Exception as ex:
                 datetimestr = datetime.now().strftime("%d/%m/%Y %H:%M:%S")
@@ -269,7 +275,8 @@ def main():
             pass
 
         try:
-            INFLUXDB_CLIENT.close()
+            if INFLUXDB_CLIENT is not None:
+                INFLUXDB_CLIENT.close()
         except:
             pass
 
