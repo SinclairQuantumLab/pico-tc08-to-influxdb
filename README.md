@@ -149,18 +149,25 @@ Open the new settings file and set:
 - `enable_influxdb_upload`: whether to upload measurements to InfluxDB
 - `measurement`: InfluxDB measurement name, if upload is enabled
 - `dirname_log`, `fname_log_meas`, `fname_log_err`: local log folder and file names
-- `channels`: active TC-08 channels and their InfluxDB channel names
+- `channels`: active TC-08 channels, thermocouple types, and InfluxDB channel names
 
-The channel table maps TC-08 channel numbers to names:
+Each channel is configured as its own table:
 
 ```toml
-[channels]
-1 = "Heater left"
-2 = "Heater right"
-3 = "AR test viewport outer rim top"
+[channels.1]
+type = "K"
+name = "Heater left"
+
+[channels.2]
+type = "K"
+name = "Heater right"
+
+[channels.3]
+type = "T"
+name = "AR test viewport outer rim top"
 ```
 
-Only channels listed in the settings file are activated. `main.py` also records channel `0` as `Cold Junction`.
+Only channels listed as `[channels.N]` are activated. `type` defaults to `K` if omitted. Temperature thermocouple type values are `B`, `E`, `J`, `K`, `N`, `R`, `S`, and `T`. PicoSDK also accepts `SPACE` to disable a channel and `X` for voltage reading mode, but this app currently logs temperature fields only. To disable a channel here, remove its `[channels.N]` block. `name` is used as the InfluxDB channel name. `main.py` also records channel `0` as `Cold Junction`.
 
 When multiple TC-08 units are connected, run one process per unit with the matching settings file:
 
@@ -242,6 +249,7 @@ It will start reading temps, print in stdout, write local logs if `enable_loggin
 - If no config path is passed, `main.py` loads `./settings.toml`.
 - If a config path is passed, `main.py` loads that file.
 - `main.py` opens the connected TC-08 whose batch/serial string matches `sn`.
+- `ThermocoupleTypeEnum` in `main.py` maps PicoSDK thermocouple type letters to their ASCII integer codes.
 - `query_device_sn.py` prints the batch/serial strings for all TC-08 loggers connected to the computer.
 - `picotest.py` is a lightweight TC-08 hardware smoke test developed from the SDK single-mode example.
 - `settings*.toml` files contain local TC-08 session configuration and are ignored by git.

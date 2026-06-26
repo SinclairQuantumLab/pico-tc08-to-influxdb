@@ -15,12 +15,49 @@ import sys
 
 import tomllib
 from typing import Any
+from enum import IntEnum
 
+# usb_tc08_get_unit_info2(..., line=4) returns the TC-08 batch/serial string.
 USBTC08LINE_BATCH_AND_SERIAL = 4
 
 
 class TC08SNNotFoundError(RuntimeError):
     """Raised when the configured TC-08 serial number is not connected."""
+
+
+class ThermocoupleTypeEnum(IntEnum):
+    """Thermocouple type mapped to the PicoSDK thermocouple type codes."""
+
+    B = ord("B")  # 66
+    E = ord("E")  # 69
+    J = ord("J")  # 74
+    K = ord("K")  # 75
+    N = ord("N")  # 78
+    R = ord("R")  # 82
+    S = ord("S")  # 83
+    T = ord("T")  # 84
+    # PicoSDK also accepts the below codes, but this app currently logs
+    # temperature fields only. Remove a [channels.N] block to disable a channel.
+    # SPACE = ord(" ")  # 32; disable the channel.
+    # X = ord("X")  # 88; voltage reading mode.
+    COLD_JUNCTION = 0  # non-PicoSDK code for internal use for cold junction
+
+
+def parse_thermocouple_type(value: str) -> ThermocoupleTypeEnum:
+    """Parse a settings.toml thermocouple type value."""
+    if not isinstance(value, str):
+        raise TypeError(
+            f"Thermocouple type must be a string, not {type(value).__name__}."
+        )
+
+    name = value.strip().upper()
+    try:
+        return ThermocoupleTypeEnum[name]
+    except KeyError as exc:
+        valid_types = ", ".join(ThermocoupleTypeEnum.__members__)
+        raise ValueError(
+            f"Invalid thermocouple type {value!r}. Expected one of: {valid_types}."
+        ) from exc
 
 
 # >>>>> app configuration >>>>>
@@ -35,9 +72,20 @@ SN = str(SETTINGS["sn"])
 period = float(SETTINGS["period_s"])  # in second
 measurement = str(SETTINGS.get("measurement", "TC08logger"))
 enable_influxdb_upload = bool(SETTINGS.get("enable_influxdb_upload", True))
-channels: dict[int, str] = {
-    int(channel): name for channel, name in SETTINGS["channels"].items()
-}
+channel_settings = SETTINGS["channels"]
+if not isinstance(channel_settings, dict):
+    raise TypeError("channels must be a TOML table.")
+channels: dict[int, str] = {}
+thermocouple_types: dict[int, ThermocoupleTypeEnum] = {}
+for channel, channel_config in channel_settings.items():
+    if not isinstance(channel_config, dict):
+        raise TypeError(f"channels.{channel} must be a TOML table.")
+
+    channel_num = int(channel)
+    channels[channel_num] = str(channel_config["name"])
+    thermocouple_types[channel_num] = parse_thermocouple_type(
+        channel_config.get("type", ThermocoupleTypeEnum.K.name)
+    )
 enable_logging = bool(SETTINGS.get("enable_logging", True))
 dirname_log = str(SETTINGS.get("dirname_log", "./logs/"))  # folder to save log files
 fname_log_meas = str(SETTINGS.get("fname_log_meas", "temp.log"))
@@ -54,6 +102,10 @@ print(f"TC-08 logger SN = {SN}")
 print(f"Settings file = {settings_path}")
 print(f"Measurement period = {period} s.")
 print(f"Active channels = {list(channels.keys())}.")
+print(
+    "Thermocouple types = "
+    f"{', '.join(f'Ch{channel}: {tc_type.name}' for channel, tc_type in thermocouple_types.items())}."
+)
 print(f"InfluxDB upload = {'enabled' if enable_influxdb_upload else 'disabled'}.")
 print(f"File logging = {'enabled' if enable_logging else 'disabled'}.")
 if enable_logging:
@@ -143,8 +195,8 @@ def open_configured_tc08(expected_sn: str) -> int:
 
 
 def main():
-    # add 0: "cold junction" to channels dict for easier handling in the measurement loop
-    channels[0] = "Cold Junction"
+    measurement_channels = {0: "Cold Junction"} | channels
+    thermocouple_types[0] = ThermocoupleTypeEnum.COLD_JUNCTION
 
     # Create chandle and status ready for use
     chandle = ctypes.c_int16()
@@ -165,12 +217,12 @@ def main():
         assert_pico2000_ok(status["set_mains"])
 
         # set up channel
-        # therocouples types and int8 equivalent
-        # B=66 , E=69 , J=74 , K=75 , N=78 , R=82 , S=83 , T=84 , ' '=32 , X=88
-        typeK = ctypes.c_int8(75)
         for channel_num in channels:
             status["set_channel"] = tc08.usb_tc08_set_channel(
-                chandle, channel_num, typeK)
+                chandle,
+                channel_num,
+                ctypes.c_int8(int(thermocouple_types[channel_num])),
+            )
             assert_pico2000_ok(status["set_channel"])
 
         # get minimum sampling interval in ms
@@ -212,19 +264,21 @@ def main():
                     # upload results to InfluxDB
                     # format your data to write to the database server
 
-                    records = \
-                        [  # channel temperatures
-                            {
-                                "measurement": measurement,
-                                "tags": {
-                                    "Logger SN": SN,
-                                    "Channel number": channel_num,
-                                    "Channel name": channel_name,
-                                },
-                                "fields": {"Temp[degC]": temp[channel_num]},
-                            }
-                            for channel_num, channel_name in channels.items()
-                        ]
+                    records = [  # channel temperatures
+                        {
+                            "measurement": measurement,
+                            "tags": {
+                                "Logger SN": SN,
+                                "Channel number": channel_num,
+                                "Channel name": channel_name,
+                                "Thermometer type": thermocouple_types[channel_num].name,
+                            },
+                            "fields": {
+                                "Temp[degC]": temp[channel_num],
+                            },
+                        }
+                        for channel_num, channel_name in measurement_channels.items()
+                    ]
 
                     # send the data
                     INFLUXDB_WRITE_API.write(

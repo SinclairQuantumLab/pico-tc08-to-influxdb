@@ -6,7 +6,7 @@ from picosdk.functions import assert_pico2000_ok
 from picosdk.usbtc08 import usbtc08 as tc08
 
 
-# Line 4 is USBTC08LINE_BATCH_AND_SERIAL in the Pico TC-08 programmer guide.
+# usb_tc08_get_unit_info2(..., line=4) returns the TC-08 batch/serial string.
 USBTC08LINE_BATCH_AND_SERIAL = 4
 
 

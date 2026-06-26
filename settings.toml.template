@@ -22,13 +22,39 @@ dirname_log = "./logs/"
 fname_log_meas = "temp.log"
 fname_log_err = "error.log"
 
-# TC08 logger channels to activate & names assigned in InfluxDB
-[channels]
-1 = "Ch1"
-2 = "Ch2"
-3 = "Ch3"
-4 = "Ch4"
-5 = "Ch5"
-6 = "Ch6"
-7 = "Ch7"
-8 = "Ch8"
+# TC08 logger channels to activate, thermocouple types, & names assigned in InfluxDB
+# Temperature thermocouple types: B, E, J, K, N, R, S, T.
+# PicoSDK also accepts SPACE to disable a channel and X for voltage reading mode,
+# but this app currently logs temperature fields only.
+# Remove a [channels.N] block to disable that channel.
+[channels.1]
+type = "K"
+name = "Ch1"
+
+[channels.2]
+type = "K"
+name = "Ch2"
+
+[channels.3]
+type = "K"
+name = "Ch3"
+
+[channels.4]
+type = "K"
+name = "Ch4"
+
+[channels.5]
+type = "K"
+name = "Ch5"
+
+[channels.6]
+type = "K"
+name = "Ch6"
+
+[channels.7]
+type = "K"
+name = "Ch7"
+
+[channels.8]
+type = "K"
+name = "Ch8"
